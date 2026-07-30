@@ -64,8 +64,18 @@ local function perfectClearScoring()
   return 2
 end
 
+local function perfectClearLevelMultiplier()
+  local score = GuidelineScoreCalc(config(5))
+  score.clear(1, SpinType.NoSpin, true)
+  if not expectInfo(score, 5, 1, 4500) then
+    return "perfect-clear bonus was not multiplied by level"
+  end
+  return 1
+end
+
 return {
   backToBackAndCombo = backToBackAndCombo,
   fixedStartingLevelGoal = fixedStartingLevelGoal,
+  perfectClearLevelMultiplier = perfectClearLevelMultiplier,
   perfectClearScoring = perfectClearScoring,
 }

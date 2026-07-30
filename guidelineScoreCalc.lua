@@ -37,8 +37,10 @@ return function(config)
     local comboScore = combo * 50 * level
     local perfectClearScore = 0
     if perfectClear then
-      perfectClearScore = lineCount == 4 and inB2B and config.b2bPerfectClear
+      perfectClearScore = (
+        lineCount == 4 and inB2B and config.b2bPerfectClear
         or config.perfectClear[lineCount + 1]
+      ) * level
     end
     score = score + basicScore + b2bScore + comboScore + perfectClearScore
     combo = combo + 1
