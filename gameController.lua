@@ -28,18 +28,20 @@ return function(config, scorer)
     config.colNumber
   )
   local enum = StateEnum.Moving
-  -- Moving: countdown for next moving, negative means moving distance
   -- LockDelaying: countdown to lock
   -- Locking: countdown to finish locking
-  local countdown = config.levelToDropCountdown(scorer.info())
+  local countdown = 0
+  -- Accumulated fractional cells for the fixed 60 Hz gravity calculation.
+  local gravityProgress = 0
   -- horizontal moving direction, -1 is to left, 1 is to right, 0 means NA
   local horizDirection = 0
   -- countdown for horizontal moving
   local horizCountdown = 0
   -- pressing key as a set, only record SoftDrop, Left and Right
   local pressing = {}
-  -- if reached, lock immediatly
-  local timesLockDelay = config.limitLockDelay
+  -- Number of move/rotation resets used after the piece first lands.
+  local lockResets = 0
+  local hasLanded = false
   -- clear rows of last lock, only meaningful when enum == StateEnum.Locking
   local clearRows = {}
   -- if < 0 means keep pausing, otherwise is the time to stop pausing
@@ -67,34 +69,48 @@ return function(config, scorer)
   end
 
   local function lock()
-    local gameOver, down, rows = state.lock()
+    local gameOver, down, rows, perfectClear = state.lock()
     enum = gameOver and StateEnum.Over or StateEnum.Locking
-    scorer.clear(#rows, state.recentSpin())
+    scorer.clear(#rows, state.recentSpin(), perfectClear)
     scorer.drop(down, scorer.DropType.HardDrop)
     countdown = #rows > 0 and config.countClear or config.countLock
     clearRows = rows
   end
 
-  local function checkLockDelay()
+  local function checkLockDelay(resetRequested)
     local pre = enum
     local ghostDown = state.ghostDown()
+    local reset = false
     if ghostDown > 0 then
       enum = StateEnum.Moving
       if pre ~= enum then
-        countdown = config.levelToDropCountdown(scorer.info())
+        gravityProgress = 0
+        if resetRequested and lockResets < config.limitLockDelay then
+          lockResets = lockResets + 1
+          countdown = config.countLockDelay
+          reset = true
+        end
       end
-    elseif timesLockDelay > 0 then
+    elseif pre ~= StateEnum.LockDelaying then
       enum = StateEnum.LockDelaying
+      if not hasLanded then
+        hasLanded = true
+        countdown = config.countLockDelay
+        reset = true
+      end
+    elseif resetRequested and lockResets < config.limitLockDelay then
+      lockResets = lockResets + 1
       countdown = config.countLockDelay
-      timesLockDelay = timesLockDelay - 1
-    else
-      lock()
+      reset = true
     end
+    return enum == StateEnum.Moving or reset
   end
 
   local function newTetromino()
-    checkLockDelay()
-    timesLockDelay = config.limitLockDelay
+    lockResets = 0
+    hasLanded = false
+    gravityProgress = 0
+    checkLockDelay(false)
     horizCountdown = horizDirection == 0 and 0 or config.countARR
   end
 
@@ -147,7 +163,7 @@ return function(config, scorer)
       end
     end
 
-    if moved then checkLockDelay() end
+    if moved then checkLockDelay(true) end
   end
 
   local function keyreleased(key)
@@ -196,18 +212,14 @@ return function(config, scorer)
         local moved = state.horizMove(horizDirection == -1)
         horiz(Input.Invalid, moved)
         if moved then
-          checkLockDelay()
-          return
+          if checkLockDelay(true) then return end
         end
       else
         horizCountdown = horizCountdown - 1
       end
 
-      if countdown > 0 then
-        countdown = countdown - 1
-      else
-        lock()
-      end
+      countdown = countdown - 1
+      if countdown <= 0 then lock() end
       return
     end
 
@@ -220,15 +232,10 @@ return function(config, scorer)
       horizCountdown = horizCountdown - 1
     end
 
-    local distance = 0
-    if countdown < 0 then
-      distance = -countdown
-    elseif countdown == 0 or pressing[Input.SoftDrop] then
-      distance = 1
-      countdown = config.levelToDropCountdown(level)
-    else
-      countdown = countdown - 1
-    end
+    gravityProgress = gravityProgress + config.levelToGravity(level)
+    local distance = math.floor(gravityProgress)
+    gravityProgress = gravityProgress - distance
+    if pressing[Input.SoftDrop] and distance < 1 then distance = 1 end
 
     distance = state.downMove(distance)
     local DropType = scorer.DropType
@@ -236,31 +243,45 @@ return function(config, scorer)
       distance,
       pressing[Input.SoftDrop] and DropType.SoftDrop or DropType.Normal
     )
-    if horizMoved or distance > 0 then checkLockDelay() end
+    if horizMoved or distance > 0 then checkLockDelay(horizMoved) end
   end
 
-  local function draw(draws)
+  -- Renderer protocol (duck typed):
+  --   bg()
+  --   bgBlank()
+  --   text(level, lines, score)
+  --   digit(value, alpha)
+  --   tetromino([row, col, dir, shape])
+  --   ghost(row, col, dir, shape, alpha)
+  --   blank(row, col, dir, shape)
+  --   zone(firstRow, lastRow, progress)
+  --   awardTetris()
+  --   awardTSpin(spin)
+  --   hold(shape)
+  --   preview(index, shape)
+  --   matrix(matrix) -- matrix is read-only to the renderer
+  local function draw(renderer)
     if enum == StateEnum.Over then
-      draws.bgBlank()
-      draws.text(scorer.info())
+      renderer.bgBlank()
+      renderer.text(scorer.info())
       return
     end
 
-    draws.bg()
-    draws.text(scorer.info())
+    renderer.bg()
+    renderer.text(scorer.info())
     if enum == StateEnum.Pausing then
       if pauseCountdown > 0 then
         local i, f = modf((pauseCountdown - 1) * 3 / config.countPause)
-        draws.digit(i + 1, f)
+        renderer.digit(i + 1, f)
       end
       return
     end
 
     if enum == StateEnum.Locking then
       local rows = #clearRows
-      draws.tetromino()
+      renderer.tetromino()
       if rows == 0 then
-        draws.blank(state.tetromino())
+        renderer.blank(state.tetromino())
       else
         local colNum = config.colNumber
         local progress = (1 - countdown / config.countClear) * (colNum + 1)
@@ -271,38 +292,38 @@ return function(config, scorer)
           if last + 1 == clearRows[i] then
             last = last + 1
           else
-            draws.zone(head, last, progress)
+            renderer.zone(head, last, progress)
             head = clearRows[i]
             last = head
           end
         end
 
         if rows == 4 then
-          draws.awardTetris()
+          renderer.awardTetris()
         else
-          draws.awardTSpin(state.recentSpin())
+          renderer.awardTSpin(state.recentSpin())
         end
       end
     else
       local row, col, dir, shape = state.tetromino()
       if enum == StateEnum.Moving then
-        draws.tetromino(row, col, dir, shape)
-        draws.ghost(row - state.ghostDown(), col, dir, shape, 0.2)
+        renderer.tetromino(row, col, dir, shape)
+        renderer.ghost(row - state.ghostDown(), col, dir, shape, 0.2)
       else
-        draws.tetromino()
+        renderer.tetromino()
         local i, f = modf((countdown - 1) / config.countLockDelay)
-        draws.ghost(row, col, dir, shape, f / 2 + 0.5)
+        renderer.ghost(row, col, dir, shape, f / 2 + 0.5)
       end
     end
 
-    draws.hold(state.holding())
+    renderer.hold(state.holding())
     local preview = config.seenPreview
     for i, pre in state.preview() do
       if i > preview then break end
-      draws.preview(i, pre)
+      renderer.preview(i, pre)
     end
 
-    draws.matrix(state.matrix())
+    renderer.matrix(state.matrix())
   end
 
   return {

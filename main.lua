@@ -10,11 +10,11 @@ end
 local love = require("love")
 local GameController = require("gameController")
 local images = require("images")
-local Draw = require("batchDraws")
+local Renderer = require("batchDraws")
 local controllerConfig = require("controllerConfig")
 require("loggc")
 
-local draw, controller, invalid, keyboardMap, gamepadMap
+local renderer, controller, invalid, keyboardMap, gamepadMap
 
 function love.load(args)
   math.randomseed(os.time())
@@ -26,7 +26,7 @@ function love.load(args)
   local stopLevel = tonumber(args[2])
   if type(stopLevel) == "number" then controllerConfig.stopLevel = stopLevel end
 
-  draw = Draw(images, love.graphics)
+  renderer = Renderer(images, love.graphics)
   local scorer = require("guidelineScoreCalc")(controllerConfig)
   controller = GameController(controllerConfig, scorer)
 
@@ -39,7 +39,11 @@ function love.load(args)
     down = Input.SoftDrop,
     space = Input.HardDrop,
     c = Input.Hold,
+    lshift = Input.Hold,
+    rshift = Input.Hold,
     z = Input.AntiClockwiseRotate,
+    lctrl = Input.AntiClockwiseRotate,
+    rctrl = Input.AntiClockwiseRotate,
     escape = Input.Pause,
   }
 
@@ -73,4 +77,4 @@ end
 
 function love.update(dt) controller.update() end
 
-function love.draw() controller.draw(draw) end
+function love.draw() controller.draw(renderer) end

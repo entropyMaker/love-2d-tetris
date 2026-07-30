@@ -1,5 +1,6 @@
 local tetromino = require("tetromino")
 local _ = require("lodash")
+local SpinType = require("spin")
 
 local function empty()
   local row = _.fill(0, 10)
@@ -899,7 +900,19 @@ local function rotate()
   return #tests
 end
 
+local function finalKickSpin()
+  local matrix = _.fill(0, 40, 10)
+  setPiece(matrix, 1, 3, 4, 5, 3, 1, 2, 3, 2)
+
+  local spin, row, col, dir = tetromino.rotate(matrix, true, 5, 5, 1, 6)
+  if spin ~= SpinType.TSpin or row ~= 3 or col ~= 4 or dir ~= 2 then
+    return "final SRS kick did not upgrade a T-Spin Mini to a full T-Spin"
+  end
+  return 1
+end
+
 return {
+  finalKickSpin = finalKickSpin,
   fromPos = fromPos,
   ghost = ghost,
   rotate = rotate,

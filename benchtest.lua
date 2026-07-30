@@ -593,7 +593,7 @@ local scorer = require("guidelineScoreCalc")(controllerConfig)
 local unpack = unpack or table.unpack
 
 local function dummy() end
-local dummyDraw = setmetatable({}, {
+local dummyRenderer = setmetatable({}, {
   __index = function() return dummy end,
 })
 
@@ -603,7 +603,7 @@ for i = 1, #records do
   if action == "update" then
     for j = 1, arg do
       c.update()
-      c.draw(dummyDraw)
+      c.draw(dummyRenderer)
     end
   else
     c[action](arg)

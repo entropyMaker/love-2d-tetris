@@ -13,7 +13,7 @@ return function(config)
   local inB2B = false
   local combo = 0
 
-  local function clear(lineCount, spin)
+  local function clear(lineCount, spin, perfectClear)
     local scoreArr
     if spin == SpinType.TSpin then
       scoreArr = config.tSpin
@@ -35,16 +35,19 @@ return function(config)
     local basicScore = scoreArr[lineCount + 1] * level
     local b2bScore = (inB2B and isDifficult) and basicScore / 2 or 0
     local comboScore = combo * 50 * level
-    score = score + basicScore + b2bScore + comboScore
+    local perfectClearScore = 0
+    if perfectClear then
+      perfectClearScore = lineCount == 4 and inB2B and config.b2bPerfectClear
+        or config.perfectClear[lineCount + 1]
+    end
+    score = score + basicScore + b2bScore + comboScore + perfectClearScore
     combo = combo + 1
     inB2B = isDifficult
 
-    local curLines = lines
-    lines = curLines + lineCount
+    lines = lines + lineCount
     local linesPerLevel = config.linesPerLevel
-    if lines - lines % linesPerLevel > curLines - curLines % linesPerLevel then
-      level = level + 1
-    end
+    local fixedGoalLevel = math.floor(lines / linesPerLevel) + 1
+    if fixedGoalLevel > level then level = fixedGoalLevel end
   end
 
   local function drop(distance, dropType)

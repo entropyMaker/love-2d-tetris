@@ -141,7 +141,7 @@ local function representStr(shape)
   return shape > 0 and s:sub(shape, shape) or s
 end
 
-local function checkSpin(row, col, dir, s, matrix)
+local function checkSpin(row, col, dir, s, matrix, finalKick)
   if s ~= "T" then return SpinType.NormalSpin end
 
   local front, back = 0, 0
@@ -158,7 +158,9 @@ local function checkSpin(row, col, dir, s, matrix)
   if occupied(matrix, row - p[i], col - p[i + 1]) then back = back + 1 end
 
   if front == 2 and back > 0 then return SpinType.TSpin end
-  if front > 0 and back == 2 then return SpinType.TSpinMini end
+  if front > 0 and back == 2 then
+    return finalKick and SpinType.TSpin or SpinType.TSpinMini
+  end
   return SpinType.NormalSpin
 end
 
@@ -168,7 +170,7 @@ local function rotate(matrix, clockwise, row, col, dir, shape)
   local r1, c1, r2, c2, r3, c3, r4, c4 = getPos(row, col, newDir, shape)
   local s = representStr(shape)
   if not conflict(matrix, r1, c1, r2, c2, r3, c3, r4, c4) then
-    return checkSpin(row, col, newDir, s, matrix), row, col, newDir
+    return checkSpin(row, col, newDir, s, matrix, false), row, col, newDir
   end
 
   local wk = (s == "I" and IWallKick or TWallKick)[clockwise and 1 or 2][dir]
@@ -189,7 +191,8 @@ local function rotate(matrix, clockwise, row, col, dir, shape)
     then
       row = row + rowOffset
       col = col + colOffset
-      return checkSpin(row, col, newDir, s, matrix), row, col, newDir
+      local finalKick = s == "T" and i == #wk - 1
+      return checkSpin(row, col, newDir, s, matrix, finalKick), row, col, newDir
     end
   end
 

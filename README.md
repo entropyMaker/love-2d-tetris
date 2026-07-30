@@ -2,6 +2,26 @@
 
 An unofficial falling-block puzzle game made with LÖVE.
 
+## Timing notice
+
+This game intentionally uses frame-based timing and assumes that
+`love.update` runs at 60 Hz. It does not use delta time (`dt`) to normalize
+gameplay speed. Run the game at 60 Hz for the intended gravity, movement,
+lock-delay, and animation timing; other update rates may make the game run
+faster or slower.
+
+## Architecture
+
+The game uses a lightweight MVC-style structure. `gameState.lua`,
+`tetromino.lua`, and `guidelineScoreCalc.lua` form the model;
+`gameController.lua` handles input and game flow; and `batchDraws.lua`
+provides the renderer.
+
+`gameController.draw(renderer)` accepts a duck-typed renderer rather than a
+concrete implementation. The required renderer methods are documented beside
+the `draw` function in `gameController.lua`. Matrix data passed to a renderer
+must be treated as read-only.
+
 ## License
 
 Code and original project material are available under the [MIT License](LICENSE).
