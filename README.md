@@ -36,7 +36,10 @@ between human input events, measures cold and warmed-up update-and-draw frames,
 and fails if any measured frame takes 16 ms or longer. Its renderer performs a
 read-only traversal of the full game matrix but does not issue graphics calls,
 so this measures game and renderer-dispatch CPU work, not LÖVE or GPU
-presentation time.
+presentation time. Results list the timer and frame scope, sample counts, and
+average, p99, and maximum times for both cold and warm frames. Cold and warm
+maximums should not be compared directly because the warm group contains many
+more samples and is therefore more likely to include a rare outlier.
 
 ## License
 

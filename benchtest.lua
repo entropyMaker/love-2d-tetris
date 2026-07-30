@@ -671,12 +671,13 @@ local function percentile(samples, fraction)
   return samples[math.ceil(#samples * fraction)]
 end
 
-local function maximum(samples)
-  local result = 0
+local function summarize(samples)
+  sort(samples)
+  local total = 0
   for i = 1, #samples do
-    if samples[i] > result then result = samples[i] end
+    total = total + samples[i]
   end
-  return result
+  return total / #samples, percentile(samples, 0.99), samples[#samples]
 end
 
 return function(replays)
@@ -694,7 +695,7 @@ return function(replays)
     newController(),
     function(elapsed) coldSamples[#coldSamples + 1] = elapsed end
   )
-  local coldWorst = maximum(coldSamples)
+  local coldAverage, coldP99, coldWorst = summarize(coldSamples)
   collectgarbage("collect")
 
   local samples = {}
@@ -712,32 +713,47 @@ return function(replays)
   end
   local benchmarkElapsed = clock() - benchmarkStarted
 
-  sort(samples)
-  local totalFrameTime = 0
-  for i = 1, #samples do
-    totalFrameTime = totalFrameTime + samples[i]
-  end
-
-  local average = totalFrameTime / totalFrames
-  local p99 = percentile(samples, 0.99)
-  local warmWorst = samples[#samples]
+  local warmAverage, warmP99, warmWorst = summarize(samples)
   local worst = math.max(coldWorst, warmWorst)
 
   print(jit.version)
-  print(string.format("replays: %d", replays))
-  print(string.format("frames: %d", totalFrames))
-  print(string.format("input events: %d", totalInputEvents))
+  print("timer: os.clock process CPU time")
+  print("frame scope: recorded input since prior frame + update + draw")
+  print(
+    "renderer: headless; read-only full-matrix traversal; no graphics calls"
+  )
+  print(string.format("cold sample: %d frames (1 replay)", #coldSamples))
+  print(
+    string.format("warm sample: %d frames (%d replays)", totalFrames, replays)
+  )
+  print(string.format("warm input events: %d", totalInputEvents))
   print(
     string.format(
       "recorded input rate: %.2f events/s at 60 Hz",
       totalInputEvents / totalFrames * 60
     )
   )
-  print(string.format("benchmark elapsed: %.3f s", benchmarkElapsed))
-  print(string.format("average frame: %.3f ms", average * 1000))
-  print(string.format("p99 frame: %.3f ms", p99 * 1000))
-  print(string.format("cold worst frame: %.3f ms", coldWorst * 1000))
-  print(string.format("warm worst frame: %.3f ms", warmWorst * 1000))
+  print(string.format("warm benchmark elapsed: %.3f s", benchmarkElapsed))
+  print(
+    string.format(
+      "cold frames: average %.3f ms, p99 %.3f ms, maximum %.3f ms",
+      coldAverage * 1000,
+      coldP99 * 1000,
+      coldWorst * 1000
+    )
+  )
+  print(
+    string.format(
+      "warm frames: average %.3f ms, p99 %.3f ms, maximum %.3f ms",
+      warmAverage * 1000,
+      warmP99 * 1000,
+      warmWorst * 1000
+    )
+  )
+  print(
+    "note: maxima use different sample counts; the larger warm sample is "
+      .. "more likely to contain a rare outlier"
+  )
   print(string.format("frame budget: %.3f ms", FRAME_BUDGET_SECONDS * 1000))
 
   assert(
