@@ -587,25 +587,166 @@ local records = {
 
 local controller = require("gameController")
 local controllerConfig = require("controllerConfig")
-controllerConfig.startLevel = 15
-local scorer = require("guidelineScoreCalc")(controllerConfig)
+local newScorer = require("guidelineScoreCalc")
 
 local unpack = unpack or table.unpack
+local clock = os.clock
+local sort = table.sort
 
-local function dummy() end
-local dummyRenderer = setmetatable({}, {
-  __index = function() return dummy end,
-})
+local FRAME_BUDGET_SECONDS = 0.016
+local DEFAULT_REPLAYS = 100
 
-local c = controller(controllerConfig, scorer)
-for i = 1, #records do
-  local action, arg = unpack(records[i])
-  if action == "update" then
-    for j = 1, arg do
-      c.update()
-      c.draw(dummyRenderer)
+local function noOp() end
+
+-- Exercise the renderer boundary without drawing or mutating the matrix.
+local function consumeMatrix(matrix)
+  local checksum = 0
+  for row = 1, #matrix do
+    local cells = matrix[row]
+    for col = 1, #cells do
+      checksum = checksum + cells[col] * (row + col)
     end
-  else
-    c[action](arg)
   end
+  return checksum
+end
+
+local benchmarkRenderer = {
+  bg = noOp,
+  bgBlank = noOp,
+  text = noOp,
+  digit = noOp,
+  tetromino = noOp,
+  ghost = noOp,
+  blank = noOp,
+  zone = noOp,
+  awardTetris = noOp,
+  awardTSpin = noOp,
+  hold = noOp,
+  preview = noOp,
+  matrix = consumeMatrix,
+}
+
+local function config()
+  local copy = {}
+  for key, value in pairs(controllerConfig) do
+    copy[key] = value
+  end
+  copy.startLevel = 15
+  return copy
+end
+
+local function newController()
+  local gameConfig = config()
+  return controller(gameConfig, newScorer(gameConfig))
+end
+
+local function replay(game, observeFrame)
+  local frames = 0
+  local inputEvents = 0
+  local pendingInputTime = 0
+
+  for i = 1, #records do
+    local action, arg = unpack(records[i])
+    if action == "update" then
+      for _ = 1, arg do
+        local started = clock()
+        game.update()
+        game.draw(benchmarkRenderer)
+        observeFrame(pendingInputTime + clock() - started)
+        pendingInputTime = 0
+        frames = frames + 1
+      end
+    else
+      local started = clock()
+      game[action](arg)
+      pendingInputTime = pendingInputTime + clock() - started
+      inputEvents = inputEvents + 1
+    end
+  end
+
+  return frames, inputEvents
+end
+
+local function percentile(samples, fraction)
+  return samples[math.ceil(#samples * fraction)]
+end
+
+local function maximum(samples)
+  local result = 0
+  for i = 1, #samples do
+    if samples[i] > result then result = samples[i] end
+  end
+  return result
+end
+
+return function(replays)
+  assert(jit, "benchmark must be run with LuaJIT")
+
+  replays = replays or DEFAULT_REPLAYS
+  assert(
+    replays >= 1 and replays % 1 == 0,
+    "benchmark replay count must be a positive integer"
+  )
+
+  math.randomseed(1)
+  local coldSamples = {}
+  replay(
+    newController(),
+    function(elapsed) coldSamples[#coldSamples + 1] = elapsed end
+  )
+  local coldWorst = maximum(coldSamples)
+  collectgarbage("collect")
+
+  local samples = {}
+  local totalFrames = 0
+  local totalInputEvents = 0
+  local benchmarkStarted = clock()
+  for _ = 1, replays do
+    math.randomseed(1)
+    local frames, inputEvents = replay(
+      newController(),
+      function(elapsed) samples[#samples + 1] = elapsed end
+    )
+    totalFrames = totalFrames + frames
+    totalInputEvents = totalInputEvents + inputEvents
+  end
+  local benchmarkElapsed = clock() - benchmarkStarted
+
+  sort(samples)
+  local totalFrameTime = 0
+  for i = 1, #samples do
+    totalFrameTime = totalFrameTime + samples[i]
+  end
+
+  local average = totalFrameTime / totalFrames
+  local p99 = percentile(samples, 0.99)
+  local warmWorst = samples[#samples]
+  local worst = math.max(coldWorst, warmWorst)
+
+  print(jit.version)
+  print(string.format("replays: %d", replays))
+  print(string.format("frames: %d", totalFrames))
+  print(string.format("input events: %d", totalInputEvents))
+  print(
+    string.format(
+      "recorded input rate: %.2f events/s at 60 Hz",
+      totalInputEvents / totalFrames * 60
+    )
+  )
+  print(string.format("benchmark elapsed: %.3f s", benchmarkElapsed))
+  print(string.format("average frame: %.3f ms", average * 1000))
+  print(string.format("p99 frame: %.3f ms", p99 * 1000))
+  print(string.format("cold worst frame: %.3f ms", coldWorst * 1000))
+  print(string.format("warm worst frame: %.3f ms", warmWorst * 1000))
+  print(string.format("frame budget: %.3f ms", FRAME_BUDGET_SECONDS * 1000))
+
+  assert(
+    worst < FRAME_BUDGET_SECONDS,
+    string.format(
+      "FAIL: worst frame %.3f ms exceeded the %.3f ms budget",
+      worst * 1000,
+      FRAME_BUDGET_SECONDS * 1000
+    )
+  )
+  print("PASS: every measured frame completed within the 16 ms budget")
 end

@@ -22,6 +22,22 @@ concrete implementation. The required renderer methods are documented beside
 the `draw` function in `gameController.lua`. Matrix data passed to a renderer
 must be treated as read-only.
 
+## Benchmark
+
+Run the headless frame-budget benchmark with LuaJIT:
+
+```sh
+luajit main.lua benchtest
+```
+
+The optional final argument sets the number of replay runs, for example
+`luajit main.lua benchtest 250`. The benchmark preserves the recorded gaps
+between human input events, measures cold and warmed-up update-and-draw frames,
+and fails if any measured frame takes 16 ms or longer. Its renderer performs a
+read-only traversal of the full game matrix but does not issue graphics calls,
+so this measures game and renderer-dispatch CPU work, not LÖVE or GPU
+presentation time.
+
 ## License
 
 Code and original project material are available under the [MIT License](LICENSE).

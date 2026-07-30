@@ -4,7 +4,9 @@ _G.unpack = unpack or table.unpack
 if select(1, ...) == "unittest" then
   return require("unittest.main")()
 elseif select(1, ...) == "benchtest" then
-  return require("benchtest")
+  local benchmark = require("benchtest")
+  local replayCount = select(2, ...)
+  return benchmark(tonumber(replayCount))
 end
 
 local love = require("love")
@@ -12,7 +14,7 @@ local GameController = require("gameController")
 local images = require("images")
 local Renderer = require("batchDraws")
 local controllerConfig = require("controllerConfig")
-require("loggc")
+-- require("loggc")
 
 local renderer, controller, invalid, keyboardMap, gamepadMap
 

@@ -24,3 +24,6 @@ jobs:
 
       - name: Run unit tests
         run: luajit main.lua unittest
+
+      - name: Check 16 ms frame budget
+        run: luajit main.lua benchtest
