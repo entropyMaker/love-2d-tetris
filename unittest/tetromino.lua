@@ -1,6 +1,7 @@
 local tetromino = require("tetromino")
 local _ = require("lodash")
 local SpinType = require("spin")
+local unpack = unpack or table.unpack
 
 local function empty()
   local row = _.fill(0, 10)
