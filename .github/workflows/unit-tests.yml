@@ -1,0 +1,29 @@
+name: Unit tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  luajit:
+    name: LuaJIT
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install LuaJIT
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes luajit
+
+      - name: Run unit tests
+        run: luajit main.lua unittest
+
+      - name: Check 16 ms frame budget
+        run: luajit main.lua benchtest

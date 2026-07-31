@@ -95,7 +95,7 @@ return function(generator, initer, rowNumber, colNumber)
     return true
   end
 
-  -- returns gameOver: bool, down: int, clearRows: table
+  -- returns gameOver: bool, down: int, clearRows: table, perfectClear: bool
   -- this function also update GameState's matrix and tetromino
   local function lock()
     local ghostRow = tetromino.ghost(matrix, row, col, dir, shape)
@@ -103,7 +103,7 @@ return function(generator, initer, rowNumber, colNumber)
     local r1, c1, r2, c2, r3, c3, r4, c4 =
       tetromino.getPos(ghostRow, col, dir, shape)
     if r1 > bound and r2 > bound and r3 > bound and r4 > bound then
-      return true, 0, _.E
+      return true, 0, _.E, false
     end
 
     if row ~= ghostRow then resetSpin() end
@@ -118,7 +118,26 @@ return function(generator, initer, rowNumber, colNumber)
     clearRows = checkClear(matrix, r4, clearRows)
     if clearRows then sort(clearRows) end
 
-    return false, distance, clearRows or _.E
+    local perfectClear = clearRows ~= nil
+    if perfectClear then
+      local cleared = {}
+      for i = 1, #clearRows do
+        cleared[clearRows[i]] = true
+      end
+      for i = 1, #matrix do
+        if not cleared[i] then
+          for j = 1, #matrix[i] do
+            if matrix[i][j] ~= 0 then
+              perfectClear = false
+              break
+            end
+          end
+        end
+        if not perfectClear then break end
+      end
+    end
+
+    return false, distance, clearRows or _.E, perfectClear
   end
 
   -- returns false if game is over, true otherwise

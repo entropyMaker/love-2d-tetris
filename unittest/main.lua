@@ -1,15 +1,23 @@
-local testTetromino = require("unittest.tetromino")
+local suites = {
+  (require("unittest.tetromino")),
+  (require("unittest.gameState")),
+  (require("unittest.gameController")),
+  (require("unittest.controllerConfig")),
+  (require("unittest.guidelineScoreCalc")),
+}
 
 local function run()
   local funcCnt, caseCnt = 0, 0
-  for name, func in pairs(testTetromino) do
-    local res = func()
-    if type(res) == "string" then
-      print(name .. " failed: " .. res)
-      os.exit(1)
+  for _, suite in ipairs(suites) do
+    for name, func in pairs(suite) do
+      local res = func()
+      if type(res) == "string" then
+        print(name .. " failed: " .. res)
+        os.exit(1)
+      end
+      funcCnt = funcCnt + 1
+      caseCnt = caseCnt + res
     end
-    funcCnt = funcCnt + 1
-    caseCnt = caseCnt + res
   end
   print(
     string.format(
