@@ -116,8 +116,38 @@ local function lockResetLimit()
   return 2
 end
 
+local function groundedHoldRestartsLockDelay()
+  local score = scorer()
+  local controller =
+    GameController(config(function() return 2, 4, 1 end, 1), score)
+  local Input = controller.Input
+
+  controller.keypressed(Input.Right)
+  controller.keyreleased(Input.Right)
+  for _ = 1, 25 do
+    controller.update()
+  end
+
+  controller.keypressed(Input.Hold)
+  for _ = 1, 5 do
+    controller.update()
+  end
+  if score.clearCount() ~= 0 then
+    return "held replacement inherited the previous piece's lock delay"
+  end
+
+  for _ = 1, 25 do
+    controller.update()
+  end
+  if score.clearCount() ~= 1 then
+    return "held replacement did not receive a fresh lock delay"
+  end
+  return 2
+end
+
 return {
   fractionalGravity = fractionalGravity,
+  groundedHoldRestartsLockDelay = groundedHoldRestartsLockDelay,
   highGravitySoftDrop = highGravitySoftDrop,
   lockResetLimit = lockResetLimit,
 }

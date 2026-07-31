@@ -110,6 +110,7 @@ return function(config, scorer)
     lockResets = 0
     hasLanded = false
     gravityProgress = 0
+    enum = StateEnum.Moving
     checkLockDelay(false)
     horizCountdown = horizDirection == 0 and 0 or config.countARR
   end
