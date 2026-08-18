@@ -2,6 +2,29 @@
 
 An unofficial falling-block puzzle game made with LÖVE.
 
+## How to play
+
+Move and rotate the falling tetrominoes to complete horizontal lines. Completed
+lines disappear and award points; clearing multiple lines at once, performing
+T-spins, maintaining back-to-back clears, and making perfect clears earn larger
+bonuses. The level increases after every 10 cleared lines, making the pieces
+fall faster. The game ends when a new tetromino can no longer enter the play
+field.
+
+The translucent **ghost piece** shows where the active tetromino will land.
+The **hold** area lets you save a tetromino for later, and the preview shows the
+next three tetrominoes. A held piece can be swapped only once per active piece.
+
+| Action | Keyboard | Gamepad |
+| --- | --- | --- |
+| Move left or right | Left / Right arrow | D-pad left / right |
+| Soft drop | Down arrow | D-pad down |
+| Hard drop | Space | D-pad up |
+| Rotate clockwise | Up arrow | B |
+| Rotate counterclockwise | Z or Ctrl | A |
+| Hold / swap piece | C or Shift | Left / right shoulder |
+| Pause / resume | Escape | Start |
+
 ## Timing notice
 
 This game intentionally uses frame-based timing and assumes that
